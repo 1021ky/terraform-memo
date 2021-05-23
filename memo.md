@@ -1027,3 +1027,197 @@ import https://www.terraform.io/docs/import/index.html 既存のリソースか�
 
 ## 追記 しばらくたってからもう一度terraformを使おうとする
 
+### aws cliが使えるか確認
+
+前提となっているaws cliが使用できる状態7日`aws configure`でaws cli確認する
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % aws configure
+zsh: /usr/local/bin/aws: bad interpreter: /usr/local/opt/python/bin/python3.7: no such file or directory
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+今のPATHに通っているPythonのバージョンを調べる。
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % python --version
+Python 3.8.1
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+今デフォルトは3.8で当時とバージョンが違うから入れ直したほうがいいと判断。
+
+[公式サイト](https://aws.amazon.com/jp/cli/)を参照して最新版のパッケージをインストールした。
+
+で、再度`aws configure`
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % aws configure
+AWS Access Key ID [****************XXXX]:
+AWS Secret Access Key [****************XXXX]:
+Default region name [ap-northeast-1]:
+Default output format [json]:
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+XXXXとなっているところは、もともと設定していた値が表示されていた。
+（怖がりなのでマスクしています）
+
+
+###　terraform update
+
+[aws get started](https://learn.hashicorp.com/tutorials/terraform/install-cli?in=terraform/aws-get-started)に沿ってアップデートしていく。
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % brew upgrade hashicorp/tap/terraform
+Updating Homebrew...
+==> Auto-updated Homebrew!
+
+...
+
+Error: hashicorp/tap/terraform not installed
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+terraform がない！？
+思い出した以前はdockernizedのterraform使っていたのだった。
+まあせっかくだからインストールをしておこう。
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % brew install hashicorp/tap/terraform
+==> Installing terraform from hashicorp/tap
+==> Downloading https://releases.hashicorp.com/terraf
+...
+
+🍺  /usr/local/Cellar/terraform/0.15.4: 3 files, 77.4MB, built in 25 seconds
+vaivailx@MacBook-Pro-2 getstarted % terraform -version
+Terraform v0.15.4
+on darwin_amd64
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+入った！
+
+### Enable tab completion
+
+ドキュメントをみると、bashであろうと、zshであろうとホームディレクトリにrcファイルがあればコマンドは同じだった。以下を実行する。
+
+```zsh
+vaivailx@MacBook-Pro-2 getstarted % terraform -install-autocomplete
+vaivailx@MacBook-Pro-2 getstarted % terraform -install-autocomplete
+Error executing CLI: 2 errors occurred:
+        * already installed in /Users/vaivailx/.bashrc
+        * already installed in /Users/vaivailx/.zshrc
+
+
+vaivailx@MacBook-Pro-2 getstarted %
+```
+
+はじめて実行したときは、何も出力されなかったので、不安に思って再実行したらもうインストールしているよとでた。
+実際補完も効いた。
+
+### Quick　start tutorial
+
+> Now that you've installed Terraform, you can provision an NGINX server in less than a minute using Docker on Mac, Windows, or Linux.
+
+1分もかけずにnginxをプロビジョンするのをチュートリアルとしてやるらしい。
+わくわく。（前回terraformさわったときはget startedやらずに実践Terraformだけさわっていたようだ。まったく記憶にないもの。）
+
+書かれているとおりに
+
+```zsh
+mkdir terraform-docker-demo && cd $_
+vaivailx@MacBook-Pro-2 getstarted % mkdir terraform-docker-demo && cd $_
+vaivailx@MacBook-Pro-2 terraform-docker-demo % vi main.tf
+vaivailx@MacBook-Pro-2 terraform-docker-demo % terraform init
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Finding latest version of kreuzwerker/docker...
+- Installing kreuzwerker/docker v2.11.0...
+- Installed kreuzwerker/docker v2.11.0 (self-signed, key ID 24E54F214569A8A5)
+
+Partner and community providers are signed by their developers.
+If you'd like to know more about provider signing, you can read about it here:
+https://www.terraform.io/docs/cli/plugins/signing.html
+
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above. Include this file in your version control repository
+so that Terraform can guarantee to make the same selections by default when
+you run "terraform init" in the future.
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+vaivailx@MacBook-Pro-2 terraform-docker-demo %
+
+```
+
+providerとしてdockerのものが入ったと。
+
+ちなみに、main.tf
+
+```terraform
+terraform {
+  required_providers {
+    docker = {
+      source = "kreuzwerker/docker"
+    }
+  }
+}
+
+provider "docker" {}
+
+resource "docker_image" "nginx" {
+  name         = "nginx:latest"
+  keep_locally = false
+}
+
+resource "docker_container" "nginx" {
+  image = docker_image.nginx.latest
+  name  = "tutorial"
+  ports {
+    internal = 80
+    external = 8000
+  }
+}
+```
+
+```zsh
+terraform apply
+```
+
+とちゅう`yes`って入力して待っていたらできましたね。
+
+```zsh
+vaivailx@MacBook-Pro-2 terraform-docker-demo % docker ps | grep 8000
+70cdfbf72fb4   f0b8a9a54136              "/docker-entrypoint.…"   48 seconds ago      Up 44 seconds      0.0.0.0:8000->80/tcp                                                                       tutorial
+vaivailx@MacBook-Pro-2 terraform-docker-demo %
+```
+
+ブラウザでもwelcomeページがでたよ。
+
+そして後始末。
+
+```zsh
+vaivailx@MacBook-Pro-2 terraform-docker-demo % terraform destroy
+
+...
+
+docker_image.nginx: Destruction complete after 0s
+
+Destroy complete! Resources: 2 destroyed.
+```
+
+いいね。
+
+業務だと、ローカルでいろんなリポジトリからファイルとってきて、各リポジトリのコンテナの立ち上げてってのはめんどうだからterraformでやっちゃうほうが
+docker composeより楽かも。
+
